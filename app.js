@@ -1,91 +1,236 @@
-// Controlled Chaos v0.1
+// Controlled Chaos v0.2
 // This first prototype uses a simple local rule system: no AI or account required.
+// new inferface
 
-const prompts = [
-  "Find something connected to your answer, but not in the same category.",
-  "Connect your answer to something that moves.",
-  "Find something that shares a shape, function, or hidden similarity.",
-  "Make a connection that seems unrelated at first—but can be explained.",
-  "Connect your answer to something from nature.",
-  "Find a link between your answer and something people invented.",
-  "Make your strangest defensible connection yet."
+
+const $ = id => document.getElementById(id);
+
+const players = [
+  { name: "Player 1", score: 0 },
+  { name: "Player 2", score: 0 }
 ];
 
-const form = document.querySelector("#answer-form");
-const input = document.querySelector("#answer-input");
-const prompt = document.querySelector("#prompt");
-const hint = document.querySelector("#hint");
-const feedback = document.querySelector("#feedback");
-const list = document.querySelector("#chain-list");
-const roundLabel = document.querySelector("#round-label");
-const chainCount = document.querySelector("#chain-count");
-const chaosFill = document.querySelector("#chaos-fill");
-const chaosValue = document.querySelector("#chaos-value");
-const resetButton = document.querySelector("#reset-button");
+const prompts = [
+  "Name something that can fly.",
+  "Name something found underwater.",
+  "Name something associated with space."
+];
 
+let mode = "";
+let round = 0;
+let turn = 0;
+let answers = [];
 let chain = [];
 let chaos = 10;
+let finished = false;
 
-function updateDisplay() {
-  roundLabel.textContent = `ROUND ${String(chain.length + 1).padStart(2, "0")}`;
-  chainCount.textContent = `${chain.length} CONNECTION${chain.length === 1 ? "" : "S"}`;
-  chaosFill.style.width = `${chaos}%`;
-  chaosValue.textContent = `${chaos}%`;
+$("rushBtn").onclick = () => startGame("rush");
+$("chainBtn").onclick = () => startGame("chain");
+$("menuBtn").onclick = showMenu;
+$("nextBtn").onclick = nextRound;
 
-  if (!chain.length) {
-    list.innerHTML = '<li class="empty-state">Your ideas will appear here.</li>';
+$("answerForm").onsubmit = event => {
+  event.preventDefault();
+  submitAnswer();
+};
+
+function startGame(selectedMode) {
+  mode = selectedMode;
+  round = 0;
+  turn = 0;
+  answers = [];
+  chain = [];
+  chaos = 10;
+  finished = false;
+
+  players.forEach(player => player.score = 0);
+
+  $("menu").hidden = true;
+  $("game").hidden = false;
+  $("modeTitle").textContent =
+    mode === "rush" ? "⚡ Chaos Rush" : "🔗 Chaos Chain";
+
+  renderRound();
+}
+
+function renderRound() {
+  $("roundInfo").textContent = `Round ${round + 1} of 3`;
+  $("prompt").textContent = mode === "rush"
+    ? prompts[round]
+    : chain.length === 0
+      ? "Start a chain with any concept."
+      : `Connect a new concept to: ${chain.at(-1)}`;
+
+  $("turnInfo").textContent =
+    `${players[turn].name}'s turn`;
+
+  $("answer").value = "";
+  $("answerForm").hidden = false;
+  $("nextBtn").hidden = true;
+  $("reveal").textContent = "";
+
+  renderChaos();
+  renderChain();
+  renderLeaderboard();
+}
+
+function submitAnswer() {
+  const answer = $("answer").value.trim();
+  if (!answer || finished) return;
+
+  answers.push({
+    player: turn,
+    text: answer
+  });
+
+  if (mode === "chain") {
+    chain.push(answer);
+    $("reveal").textContent =
+      `${players[turn].name} added: ${answer}`;
   } else {
-    list.innerHTML = "";
-    chain.forEach((word) => {
-      const item = document.createElement("li");
-      item.textContent = word;
-      list.appendChild(item);
-    });
+    $("reveal").textContent =
+      "Answer locked! Pass the device to the next player.";
+  }
+
+  $("answer").value = "";
+
+  if (turn === 0) {
+    turn = 1;
+    $("turnInfo").textContent = "Player 2's turn";
+    $("answerForm").hidden = false;
+
+    if (mode === "chain") {
+      $("prompt").textContent =
+        `Connect a new concept to: ${chain.at(-1)}`;
+      renderChain();
+    }
+  } else {
+    finishRound();
   }
 }
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const answer = input.value.trim();
-  if (!answer) return;
+function finishRound() {
+  $("answerForm").hidden = true;
 
-  if (chain.some((word) => word.toLowerCase() === answer.toLowerCase())) {
-    feedback.textContent = "You've already used that idea. Find a new route.";
+  const normalized = answers.map(item =>
+    item.text.toLowerCase().trim()
+  );
+
+  const sameAnswer = normalized[0] === normalized[1];
+
+  const results = answers.map((item, index) => {
+    // Simulated rarity, not real population statistics.
+    const globalRarity = Math.min(
+      100,
+      35 + item.text.length * 3
+    );
+
+    const matchRarity = sameAnswer ? 10 : 85;
+
+    const rarity = Math.round(
+      globalRarity * 0.6 + matchRarity * 0.4
+    );
+
+    // Placeholder values until validation is implemented.
+    const connection = 70;
+    const creativity = 60;
+
+    const points =
+      rarity * 4 +
+      connection * 4 +
+      creativity * 2;
+
+    players[item.player].score += points;
+
+    return {
+      name: players[item.player].name,
+      answer: item.text,
+      points
+    };
+  });
+
+  $("reveal").replaceChildren();
+
+  results.forEach(result => {
+    const line = document.createElement("p");
+    line.textContent =
+      `${result.name}: ${result.answer} — ${result.points} pts`;
+    $("reveal").appendChild(line);
+  });
+
+  chaos = Math.min(95, chaos + 25);
+  renderChaos();
+  renderChain();
+  renderLeaderboard();
+
+  $("turnInfo").textContent = "Round complete!";
+  $("nextBtn").hidden = false;
+  $("nextBtn").textContent =
+    round === 2 ? "See Winner" : "Next Round";
+}
+
+function nextRound() {
+  if (round === 2) {
+    finishGame();
     return;
   }
 
-  chain.push(answer);
-  chaos = Math.min(95, 10 + chain.length * 12);
-  const previous = chain.length > 1 ? chain[chain.length - 2] : "the starting prompt";
+  round++;
+  turn = 0;
+  answers = [];
+  renderRound();
+}
 
-  if (chain.length === 1) {
-    feedback.textContent = `First link placed: ${answer}. Now follow the association.`;
-    prompt.textContent = prompts[0];
-    hint.textContent = `Your next answer should connect to “${answer}.”`;
-  } else {
-    feedback.textContent = ` 연결: ${previous} → ${answer}. Keep the chain defensible.`;
-    const nextPrompt = prompts[Math.min(chain.length - 1, prompts.length - 1)];
-    prompt.textContent = nextPrompt;
-    hint.textContent = `Your next answer should connect to “${answer}.”`;
-  }
+function finishGame() {
+  finished = true;
+  $("nextBtn").hidden = true;
+  $("answerForm").hidden = true;
 
-  if (chaos >= 90) {
-    hint.textContent += " Chaos is near its limit—make the connection surprising, but explainable.";
-  }
+  const winner =
+    players[0].score === players[1].score
+      ? "It's a tie!"
+      : players[0].score > players[1].score
+        ? "Player 1 wins!"
+        : "Player 2 wins!";
 
-  input.value = "";
-  updateDisplay();
-  input.focus();
-});
+  $("turnInfo").textContent = "MATCH COMPLETE";
+  $("reveal").textContent = `🏆 ${winner}`;
+}
 
-resetButton.addEventListener("click", () => {
-  chain = [];
-  chaos = 10;
-  prompt.textContent = "Name something that grows.";
-  hint.textContent = "Start anywhere. Your answer becomes the next link.";
-  feedback.textContent = "Make your first connection.";
-  input.value = "";
-  updateDisplay();
-});
+function renderLeaderboard() {
+  $("leaderboard").replaceChildren();
 
+  [...players]
+    .sort((a, b) => b.score - a.score)
+    .forEach(player => {
+      const line = document.createElement("p");
+      line.textContent =
+        `${player.name}: ${player.score} pts`;
+      $("leaderboard").appendChild(line);
+    });
+}
+
+function renderChaos() {
+  $("chaosFill").style.width = `${chaos}%`;
+  $("chaosText").textContent = `Chaos: ${chaos}%`;
+}
+
+function renderChain() {
+  $("chainHistory").replaceChildren();
+
+  if (mode !== "chain") return;
+
+  const title = document.createElement("h3");
+  title.textContent = "Shared Chain";
+  $("chainHistory").appendChild(title);
+
+  const line = document.createElement("p");
+  line.textContent = chain.join(" → ");
+  $("chainHistory").appendChild(line);
+}
+
+function showMenu() {
+  $("game").hidden = true;
+  $("menu").hidden = false;
+}
 updateDisplay();
