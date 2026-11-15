@@ -60,23 +60,78 @@
 
       <p id="turnInfo"></p>
 
-      <form id="answerForm">
 
-        <input
 
-          id="answer"
+<form id="answerForm">
 
-          placeholder="Enter your answer"
+  <input
 
-          autocomplete="off"
+    id="answer"
 
-          required
+    placeholder="Enter your answer"
 
-        >
+    autocomplete="off"
 
-        <button type="submit">Submit</button>
+    required
 
-      </form>
+  >
+
+  <textarea
+
+    id="explanation"
+
+    placeholder="Explain why your answer fits..."
+
+    rows="3"
+
+    required
+
+  ></textarea>
+
+  <button type="submit">Submit Answer</button>
+
+</form>
+
+<div id="scoreBreakdown"></div>
+
+<div id="challengePanel" hidden>
+
+  <h3>⚖️ Challenge This Answer</h3>
+
+  <p id="challengeInfo"></p>
+
+  <button id="acceptBtn" type="button">
+
+    Accept Score
+
+  </button>
+
+  <button id="challengeBtn" type="button">
+
+    Challenge Answer
+
+  </button>
+
+  <div id="reviewPanel" hidden>
+
+    <p>Review the answer and explanation.</p>
+
+    <button id="validBtn" type="button">
+
+      Connection Valid
+
+    </button>
+
+    <button id="invalidBtn" type="button">
+
+      Connection Invalid
+
+    </button>
+
+  </div>
+
+</div>
+      
 
       <div id="reveal"></div>
 
