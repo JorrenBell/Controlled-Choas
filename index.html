@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#10131d" />
+  <title>Controlled Chaos</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="mark">CC<span> / </span>01</div>
+      <div class="status"><span class="pulse"></span> PROTOTYPE</div>
+    </header>
+
+    <section class="hero">
+      <p class="eyebrow">A GAME OF CONNECTIONS</p>
+      <h1>CONTROLLED<br /><em>CHAOS.</em></h1>
+      <p class="intro">Follow a chain of ideas. Get stranger without losing the thread.</p>
+    </section>
+
+    <section class="game-card" aria-live="polite">
+      <div class="card-head">
+        <span id="round-label">ROUND 01</span>
+        <span id="chain-count">0 CONNECTIONS</span>
+      </div>
+      <div class="chaos-row">
+        <span>ORDER</span>
+        <div class="meter"><div id="chaos-fill"></div></div>
+        <span>CHAOS <b id="chaos-value">10%</b></span>
+      </div>
+
+      <p class="prompt-label">YOUR CHALLENGE</p>
+      <h2 id="prompt">Name something that grows.</h2>
+      <p class="hint" id="hint">Start anywhere. Your answer becomes the next link.</p>
+
+      <form id="answer-form">
+        <label class="sr-only" for="answer-input">Your answer</label>
+        <input id="answer-input" maxlength="50" autocomplete="off" placeholder="Type an answer..." required />
+        <button type="submit">CONNECT <span>↗</span></button>
+      </form>
+      <p id="feedback" class="feedback">Make your first connection.</p>
+    </section>
+
+    <section class="chain-section">
+      <div class="section-heading">
+        <h3>YOUR CHAIN</h3>
+        <button id="reset-button" class="text-button" type="button">RESET ↺</button>
+      </div>
+      <ol id="chain-list" class="chain-list">
+        <li class="empty-state">Your ideas will appear here.</li>
+      </ol>
+    </section>
+
+    <footer>BUILT FOR CURIOSITY <span>·</span> VERSION 0.1</footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
