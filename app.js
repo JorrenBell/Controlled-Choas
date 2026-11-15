@@ -2,12 +2,11 @@
 // This first prototype uses a simple local rule system: no AI or account required.
 // new inferface
 
-
 const $ = id => document.getElementById(id);
 
 const players = [
-  { name: "Player 1", score: 0 },
-  { name: "Player 2", score: 0 }
+  { name: "Player 1", score: 0, challenges: 1 },
+  { name: "Player 2", score: 0, challenges: 1 }
 ];
 
 const prompts = [
@@ -23,11 +22,18 @@ let answers = [];
 let chain = [];
 let chaos = 10;
 let finished = false;
+let reviewIndex = 0;
+let reviewing = false;
 
 $("rushBtn").onclick = () => startGame("rush");
 $("chainBtn").onclick = () => startGame("chain");
 $("menuBtn").onclick = showMenu;
 $("nextBtn").onclick = nextRound;
+
+$("acceptBtn").onclick = acceptScore;
+$("challengeBtn").onclick = challengeAnswer;
+$("validBtn").onclick = () => resolveChallenge(true);
+$("invalidBtn").onclick = () => resolveChallenge(false);
 
 $("answerForm").onsubmit = event => {
   event.preventDefault();
@@ -42,8 +48,12 @@ function startGame(selectedMode) {
   chain = [];
   chaos = 10;
   finished = false;
+  reviewing = false;
 
-  players.forEach(player => player.score = 0);
+  players.forEach(player => {
+    player.score = 0;
+    player.challenges = 1;
+  });
 
   $("menu").hidden = true;
   $("game").hidden = false;
@@ -55,6 +65,7 @@ function startGame(selectedMode) {
 
 function renderRound() {
   $("roundInfo").textContent = `Round ${round + 1} of 3`;
+
   $("prompt").textContent = mode === "rush"
     ? prompts[round]
     : chain.length === 0
@@ -65,9 +76,13 @@ function renderRound() {
     `${players[turn].name}'s turn`;
 
   $("answer").value = "";
+  $("explanation").value = "";
   $("answerForm").hidden = false;
   $("nextBtn").hidden = true;
-  $("reveal").textContent = "";
+  $("challengePanel").hidden = true;
+  $("reviewPanel").hidden = true;
+  $("reveal").replaceChildren();
+  $("scoreBreakdown").replaceChildren();
 
   renderChaos();
   renderChain();
@@ -75,33 +90,47 @@ function renderRound() {
 }
 
 function submitAnswer() {
-  const answer = $("answer").value.trim();
-  if (!answer || finished) return;
+  if (reviewing || finished) return;
 
-  answers.push({
+  const text = $("answer").value.trim();
+  const explanation = $("explanation").value.trim();
+
+  if (!text || !explanation) return;
+
+  const previous = chain.at(-1) || null;
+
+  const entry = {
     player: turn,
-    text: answer
-  });
+    text,
+    explanation,
+    previous,
+    points: 0,
+    reviewed: false
+  };
+
+  answers.push(entry);
 
   if (mode === "chain") {
-    chain.push(answer);
-    $("reveal").textContent =
-      `${players[turn].name} added: ${answer}`;
-  } else {
-    $("reveal").textContent =
-      "Answer locked! Pass the device to the next player.";
+    chain.push(text);
   }
 
   $("answer").value = "";
+  $("explanation").value = "";
 
   if (turn === 0) {
     turn = 1;
     $("turnInfo").textContent = "Player 2's turn";
-    $("answerForm").hidden = false;
 
-    if (mode === "chain") {
+    if (mode === "rush") {
+      $("reveal").textContent =
+        "Answer locked! Pass the device to Player 2.";
+    } else {
+      $("reveal").textContent =
+        `Player 1 added: ${text} — ${explanation}`;
+
       $("prompt").textContent =
-        `Connect a new concept to: ${chain.at(-1)}`;
+        `Connect a new concept to: ${text}`;
+
       renderChain();
     }
   } else {
@@ -109,53 +138,50 @@ function submitAnswer() {
   }
 }
 
+function normalize(text) {
+  return text.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function calculateScore(entry) {
+  const duplicate = answers.some(other =>
+    other !== entry &&
+    normalize(other.text) === normalize(entry.text)
+  );
+
+  // Simulated global rarity, not actual player statistics.
+  const globalRarity = Math.min(
+    100,
+    35 + entry.text.length * 3
+  );
+
+  const matchRarity = duplicate ? 10 : 85;
+
+  const rarity = Math.round(
+    globalRarity * 0.6 + matchRarity * 0.4
+  );
+
+  // These are provisional estimates, not semantic AI judging.
+  const connection = 70;
+  const creativity = 60;
+
+  return {
+    globalRarity,
+    matchRarity,
+    rarity,
+    connection,
+    creativity,
+    total: rarity * 4 + connection * 4 + creativity * 2
+  };
+}
+
 function finishRound() {
   $("answerForm").hidden = true;
 
-  const normalized = answers.map(item =>
-    item.text.toLowerCase().trim()
-  );
-
-  const sameAnswer = normalized[0] === normalized[1];
-
-  const results = answers.map((item, index) => {
-    // Simulated rarity, not real population statistics.
-    const globalRarity = Math.min(
-      100,
-      35 + item.text.length * 3
-    );
-
-    const matchRarity = sameAnswer ? 10 : 85;
-
-    const rarity = Math.round(
-      globalRarity * 0.6 + matchRarity * 0.4
-    );
-
-    // Placeholder values until validation is implemented.
-    const connection = 70;
-    const creativity = 60;
-
-    const points =
-      rarity * 4 +
-      connection * 4 +
-      creativity * 2;
-
-    players[item.player].score += points;
-
-    return {
-      name: players[item.player].name,
-      answer: item.text,
-      points
-    };
-  });
-
-  $("reveal").replaceChildren();
-
-  results.forEach(result => {
-    const line = document.createElement("p");
-    line.textContent =
-      `${result.name}: ${result.answer} — ${result.points} pts`;
-    $("reveal").appendChild(line);
+  answers.forEach(entry => {
+    const score = calculateScore(entry);
+    entry.breakdown = score;
+    entry.points = score.total;
+    players[entry.player].score += entry.points;
   });
 
   chaos = Math.min(95, chaos + 25);
@@ -163,10 +189,120 @@ function finishRound() {
   renderChain();
   renderLeaderboard();
 
+  reviewIndex = 0;
+  reviewing = true;
+  showReview();
+}
+
+function showReview() {
+  const entry = answers[reviewIndex];
+
+  if (!entry) {
+    completeRound();
+    return;
+  }
+
+  const opponent = players[1 - entry.player];
+
+  $("reveal").replaceChildren();
+  $("scoreBreakdown").replaceChildren();
+
+  const answerLine = document.createElement("p");
+  answerLine.textContent =
+    `${players[entry.player].name}: ${entry.text}`;
+
+  const explanationLine = document.createElement("p");
+  explanationLine.textContent =
+    `Explanation: ${entry.explanation}`;
+
+  $("reveal").append(answerLine, explanationLine);
+
+  const scoreLine = document.createElement("p");
+  scoreLine.textContent =
+    `Provisional score: ${entry.points} / 1000`;
+
+  const detailLine = document.createElement("p");
+  detailLine.textContent =
+    `Connection: ${entry.breakdown.connection}/100 | ` +
+    `Hybrid rarity: ${entry.breakdown.rarity}/100 | ` +
+    `Creativity: ${entry.breakdown.creativity}/100`;
+
+  $("scoreBreakdown").append(scoreLine, detailLine);
+
+  $("challengePanel").hidden = false;
+  $("reviewPanel").hidden = true;
+
+  $("challengeInfo").textContent =
+    `${opponent.name}: ${opponent.challenges} challenge(s) left`;
+
+  $("challengeBtn").disabled = opponent.challenges === 0;
+  $("turnInfo").textContent =
+    `${opponent.name}, accept or challenge this answer.`;
+}
+
+function acceptScore() {
+  if (!reviewing) return;
+
+  $("reviewPanel").hidden = true;
+  reviewIndex++;
+  showReview();
+}
+
+function challengeAnswer() {
+  if (!reviewing) return;
+
+  const entry = answers[reviewIndex];
+  const challenger = players[1 - entry.player];
+
+  if (challenger.challenges <= 0) return;
+
+  challenger.challenges--;
+  $("reviewPanel").hidden = false;
+  $("acceptBtn").disabled = true;
+  $("challengeBtn").disabled = true;
+
+  $("challengeInfo").textContent =
+    "Challenge started. Review the explanation together.";
+}
+
+function resolveChallenge(valid) {
+  if (!reviewing) return;
+
+  const entry = answers[reviewIndex];
+  const defender = players[entry.player];
+  const challenger = players[1 - entry.player];
+
+  if (!valid) {
+    // Successful challenge: defender loses provisional points.
+    defender.score -= entry.points;
+    entry.points = 0;
+  } else {
+    // Unsuccessful challenge: challenger loses 100 points.
+    challenger.score -= 100;
+  }
+
+  entry.reviewed = true;
+  $("acceptBtn").disabled = false;
+  $("challengeBtn").disabled = false;
+
+  renderLeaderboard();
+
+  reviewIndex++;
+  showReview();
+}
+
+function completeRound() {
+  reviewing = false;
+  $("challengePanel").hidden = true;
+  $("reviewPanel").hidden = true;
+
   $("turnInfo").textContent = "Round complete!";
   $("nextBtn").hidden = false;
   $("nextBtn").textContent =
     round === 2 ? "See Winner" : "Next Round";
+
+  $("reveal").textContent =
+    "All answers reviewed. Scores are finalized.";
 }
 
 function nextRound() {
@@ -205,7 +341,9 @@ function renderLeaderboard() {
     .forEach(player => {
       const line = document.createElement("p");
       line.textContent =
-        `${player.name}: ${player.score} pts`;
+        `${player.name}: ${player.score} pts ` +
+        `(${player.challenges} challenges left)`;
+
       $("leaderboard").appendChild(line);
     });
 }
@@ -222,14 +360,15 @@ function renderChain() {
 
   const title = document.createElement("h3");
   title.textContent = "Shared Chain";
-  $("chainHistory").appendChild(title);
 
   const line = document.createElement("p");
   line.textContent = chain.join(" → ");
-  $("chainHistory").appendChild(line);
+
+  $("chainHistory").append(title, line);
 }
 
 function showMenu() {
+  reviewing = false;
   $("game").hidden = true;
   $("menu").hidden = false;
 }
